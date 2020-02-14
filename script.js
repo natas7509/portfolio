@@ -1,157 +1,126 @@
-const cardsContainer = document.getElementById('cards-container');
-const prevBtn = document.getElementById('prev');
-const nextBtn = document.getElementById('next');
-const currentEl = document.getElementById('current');
-const showBtn = document.getElementById('show');
-const hideBtn = document.getElementById('hide');
-const questionEl = document.getElementById('question');
-const answerEl = document.getElementById('answer');
-const addCardBtn = document.getElementById('add-card');
-const clearBtn = document.getElementById('clear');
-const addContainer = document.getElementById('add-container');
+const search = document.getElementById('search'),
+  submit = document.getElementById('submit'),
+  random = document.getElementById('random'),
+  mealsEl = document.getElementById('meals'),
+  resultHeading = document.getElementById('result-heading'),
+  single_mealEl = document.getElementById('single-meal');
 
-// Keep track of current card
-let currentActiveCard = 0;
+// Search meal and fetch from API
+function searchMeal(e) {
+  e.preventDefault();
 
-// Store DOM cards
-const cardsEl = [];
+  // Clear single meal
+  single_mealEl.innerHTML = '';
 
-// Store card data
-const cardsData = getCardsData();
+  // Get search term
+  const term = search.value;
 
-// const cardsData = [
-//   {
-//     question: 'What must a variable begin with?',
-//     answer: 'A letter, $ or _'
-//   },
-//   {
-//     question: 'What is a variable?',
-//     answer: 'Container for a piece of data'
-//   },
-//   {
-//     question: 'Example of Case Sensitive Variable',
-//     answer: 'thisIsAVariable'
-//   }
-// ];
+  // Check for empty
+  if (term.trim()) {
+    fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${term}`)
+      .then(res => res.json())
+      .then(data => {
+        console.log(data);
+        resultHeading.innerHTML = `<h2>Search results for '${term}':</h2>`;
 
-// Create all cards
-function createCards() {
-  cardsData.forEach((data, index) => createCard(data, index));
+        if (data.meals === null) {
+          resultHeading.innerHTML = `<p>There are no search results. Try again!<p>`;
+        } else {
+          mealsEl.innerHTML = data.meals
+            .map(
+              meal => `
+            <div class="meal">
+              <img src="${meal.strMealThumb}" alt="${meal.strMeal}" />
+              <div class="meal-info" data-mealID="${meal.idMeal}">
+                <h3>${meal.strMeal}</h3>
+              </div>
+            </div>
+          `
+            )
+            .join('');
+        }
+      });
+    // Clear search text
+    search.value = '';
+  } else {
+    alert('Please enter a search term');
+  }
 }
 
-// Create a single card in DOM
-function createCard(data, index) {
-  const card = document.createElement('div');
-  card.classList.add('card');
+// Fetch meal by ID
+function getMealById(mealID) {
+  fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${mealID}`)
+    .then(res => res.json())
+    .then(data => {
+      const meal = data.meals[0];
 
-  if (index === 0) {
-    card.classList.add('active');
+      addMealToDOM(meal);
+    });
+}
+
+// Fetch random meal from API
+function getRandomMeal() {
+  // Clear meals and heading
+  mealsEl.innerHTML = '';
+  resultHeading.innerHTML = '';
+
+  fetch(`https://www.themealdb.com/api/json/v1/1/random.php`)
+    .then(res => res.json())
+    .then(data => {
+      const meal = data.meals[0];
+
+      addMealToDOM(meal);
+    });
+}
+
+// Add meal to DOM
+function addMealToDOM(meal) {
+  const ingredients = [];
+
+  for (let i = 1; i <= 20; i++) {
+    if (meal[`strIngredient${i}`]) {
+      ingredients.push(
+        `${meal[`strIngredient${i}`]} - ${meal[`strMeasure${i}`]}`
+      );
+    } else {
+      break;
+    }
   }
 
-  card.innerHTML = `
-  <div class="inner-card">
-  <div class="inner-card-front">
-    <p>
-      ${data.question}
-    </p>
-  </div>
-  <div class="inner-card-back">
-    <p>
-      ${data.answer}
-    </p>
-  </div>
-</div>
+  single_mealEl.innerHTML = `
+    <div class="single-meal">
+      <h1>${meal.strMeal}</h1>
+      <img src="${meal.strMealThumb}" alt="${meal.strMeal}" />
+      <div class="single-meal-info">
+        ${meal.strCategory ? `<p>${meal.strCategory}</p>` : ''}
+        ${meal.strArea ? `<p>${meal.strArea}</p>` : ''}
+      </div>
+      <div class="main">
+        <p>${meal.strInstructions}</p>
+        <h2>Ingredients</h2>
+        <ul>
+          ${ingredients.map(ing => `<li>${ing}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
   `;
-
-  card.addEventListener('click', () => card.classList.toggle('show-answer'));
-
-  // Add to DOM cards
-  cardsEl.push(card);
-
-  cardsContainer.appendChild(card);
-
-  updateCurrentText();
 }
-
-// Show number of cards
-function updateCurrentText() {
-  currentEl.innerText = `${currentActiveCard + 1}/${cardsEl.length}`;
-}
-
-// Get cards from local storage
-function getCardsData() {
-  const cards = JSON.parse(localStorage.getItem('cards'));
-  return cards === null ? [] : cards;
-}
-
-// Add card to local storage
-function setCardsData(cards) {
-  localStorage.setItem('cards', JSON.stringify(cards));
-  window.location.reload();
-}
-
-createCards();
 
 // Event listeners
+submit.addEventListener('submit', searchMeal);
+random.addEventListener('click', getRandomMeal);
 
-// Next button
-nextBtn.addEventListener('click', () => {
-  cardsEl[currentActiveCard].className = 'card left';
+mealsEl.addEventListener('click', e => {
+  const mealInfo = e.path.find(item => {
+    if (item.classList) {
+      return item.classList.contains('meal-info');
+    } else {
+      return false;
+    }
+  });
 
-  currentActiveCard = currentActiveCard + 1;
-
-  if (currentActiveCard > cardsEl.length - 1) {
-    currentActiveCard = cardsEl.length - 1;
+  if (mealInfo) {
+    const mealID = mealInfo.getAttribute('data-mealid');
+    getMealById(mealID);
   }
-
-  cardsEl[currentActiveCard].className = 'card active';
-
-  updateCurrentText();
-});
-
-// Prev button
-prevBtn.addEventListener('click', () => {
-  cardsEl[currentActiveCard].className = 'card right';
-
-  currentActiveCard = currentActiveCard - 1;
-
-  if (currentActiveCard < 0) {
-    currentActiveCard = 0;
-  }
-
-  cardsEl[currentActiveCard].className = 'card active';
-
-  updateCurrentText();
-});
-
-// Show add container
-showBtn.addEventListener('click', () => addContainer.classList.add('show'));
-// Hide add container
-hideBtn.addEventListener('click', () => addContainer.classList.remove('show'));
-
-// Add new card
-addCardBtn.addEventListener('click', () => {
-  const question = questionEl.value;
-  const answer = answerEl.value;
-
-  if (question.trim() && answer.trim()) {
-    const newCard = { question, answer };
-
-    createCard(newCard);
-
-    questionEl.value = '';
-    answerEl.value = '';
-
-    addContainer.classList.remove('show');
-
-    cardsData.push(newCard);
-    setCardsData(cardsData);
-  }
-});
-
-// Clear cards button
-clearBtn.addEventListener('click', () => {
-  localStorage.clear();
-  cardsContainer.innerHTML = '';
-  window.location.reload();
 });
